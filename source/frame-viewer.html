@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Reference frames</title>
+    <style>
+      html, body { margin: 0; background: #f6eadf; }
+      video, canvas { width: 720px; height: 720px; display: block; }
+    </style>
+  </head>
+  <body>
+    <video id="video" src="./reference.mp4" muted playsinline crossorigin="anonymous"></video>
+    <canvas id="canvas" width="720" height="720"></canvas>
+    <script>
+      async function captureFrame(time) {
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+        await new Promise((resolve) => {
+          if (video.readyState >= 1) resolve();
+          else video.addEventListener("loadedmetadata", resolve, { once: true });
+        });
+        video.currentTime = time;
+        await new Promise((resolve) => video.addEventListener("seeked", resolve, { once: true }));
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL("image/png");
+      }
+
+      const params = new URLSearchParams(location.search);
+      captureFrame(Number(params.get("t") || 0.5));
+    </script>
+  </body>
+</html>
