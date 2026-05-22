@@ -17,6 +17,14 @@ const playerSpriteHeight = 225;
 const playerGroundOffset = 116;
 const playerMouthOffset = { x: 110, y: 9 };
 const itemMouthHeight = playerGroundOffset - playerMouthOffset.y;
+const assetStatus = {
+  total: 0,
+  loaded: 0,
+  failed: 0,
+  ready: false,
+  error: "",
+};
+const assetPromises = [];
 const playerSprites = {
   walk: loadFrames("assets/player/walk/walk_", 4),
   walkOpen: loadFrames("assets/player/walk/walk_", 4, "_open"),
@@ -33,6 +41,8 @@ const itemPatterns = [
 ];
 
 let game;
+startButton.disabled = true;
+startButton.textContent = "素材加载中...";
 
 function loadFrames(prefix, count, suffix = "") {
   return Array.from({ length: count }, (_, index) => {
@@ -40,16 +50,34 @@ function loadFrames(prefix, count, suffix = "") {
   });
 }
 
-function loadFrameSequence(prefix, sequence) {
-  return sequence.map((frameNumber) => {
-    return loadImage(`${prefix}${String(frameNumber).padStart(2, "0")}.png`);
-  });
-}
-
 function loadImage(src) {
   const image = new Image();
+  assetStatus.total += 1;
+  const promise = new Promise((resolve, reject) => {
+    image.addEventListener("load", () => {
+      assetStatus.loaded += 1;
+      resolve(image);
+    }, { once: true });
+    image.addEventListener("error", () => {
+      assetStatus.failed += 1;
+      reject(new Error(`素材加载失败: ${src}`));
+    }, { once: true });
+  });
   image.src = `./${src}`;
+  assetPromises.push(promise);
   return image;
+}
+
+function markAssetsReady() {
+  assetStatus.ready = true;
+  startButton.disabled = false;
+  startButton.textContent = "开始游戏";
+}
+
+function markAssetsFailed(error) {
+  assetStatus.error = error.message;
+  startButton.disabled = true;
+  startButton.textContent = "素材加载失败";
 }
 
 function resizeCanvas() {
@@ -106,6 +134,7 @@ function resetGame({ playing = false } = {}) {
 }
 
 function startGame() {
+  if (!assetStatus.ready) return;
   resetGame({ playing: true });
 }
 
@@ -290,6 +319,11 @@ function draw() {
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, W, H);
 
+  if (!assetStatus.ready) {
+    drawLoading();
+    return;
+  }
+
   for (const cloud of game.clouds) drawCloud(cloud.x, cloud.y, cloud.s);
   drawGround();
   drawItems();
@@ -297,6 +331,19 @@ function draw() {
   drawEffects();
   drawHud();
   if (game.over) drawGameOver();
+}
+
+function drawLoading() {
+  drawCloud(120, 180, 0.9);
+  drawCloud(520, 145, 0.72);
+  drawGround();
+
+  const progress = assetStatus.total === 0
+    ? 0
+    : Math.round((assetStatus.loaded / assetStatus.total) * 100);
+  const y = Math.round(H * 0.42);
+  const message = assetStatus.error || `素材加载中 ${progress}%`;
+  outlinedText(message, 98, y, assetStatus.error ? 34 : 38);
 }
 
 function drawEffects() {
@@ -404,13 +451,11 @@ function drawRider() {
   ctx.rotate(r.angle);
   ctx.translate(-52, -58);
 
-  if (!drawKittenSprite(stride, jumpPose)) {
-    drawKitten(0, 0, stride, jumpPose);
-  }
+  drawKittenSprite(jumpPose);
   ctx.restore();
 }
 
-function drawKittenSprite(stride, jumpPose) {
+function drawKittenSprite(jumpPose) {
   const r = game.rider;
   const frames = r.grounded ? playerSprites.walk : playerSprites.jump;
   const frameIndex = r.grounded
@@ -421,7 +466,6 @@ function drawKittenSprite(stride, jumpPose) {
     game.eating &&
     game.t <= game.eating.until;
   const image = openFrame ? playerSprites.walkOpen[game.eating.frameIndex] : frames[frameIndex];
-  if (!image?.complete || image.naturalWidth === 0) return false;
 
   const scale = playerSpriteHeight / image.naturalHeight;
   const feetX = 56;
@@ -430,7 +474,6 @@ function drawKittenSprite(stride, jumpPose) {
   const drawH = image.naturalHeight * scale;
 
   ctx.drawImage(image, feetX - drawW * 0.5, feetY - drawH, drawW, drawH);
-  return true;
 }
 
 function jumpFrameIndex(airTime, jumpPose) {
@@ -439,268 +482,6 @@ function jumpFrameIndex(airTime, jumpPose) {
   if (jumpPose < 0.22) return 2;
   if (jumpPose < 0.82) return 3;
   return 0;
-}
-
-function drawKitten(x, y, stride, jumpPose) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  drawCape(52, 68, stride, jumpPose);
-  drawCatTail(14, 74, stride, jumpPose);
-  drawCatLeg(34, 93, -stride, jumpPose);
-  drawCatLeg(69, 93, stride, jumpPose);
-  drawCatBody(52, 63, stride, jumpPose);
-  drawCatArm(22, 57, -1, stride, jumpPose);
-  drawCatArm(82, 57, 1, stride, jumpPose);
-  drawCatHead(52, 28, stride, jumpPose);
-  drawScarf(52, 58, stride, jumpPose);
-  ctx.restore();
-}
-
-function drawCape(x, y, stride, jumpPose) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 5;
-  ctx.fillStyle = "#91ddd5";
-  const wind = Math.max(0, -jumpPose) * 8 + Math.abs(stride) * 3;
-
-  ctx.beginPath();
-  ctx.moveTo(-31, -8);
-  ctx.bezierCurveTo(-56 - wind, 9, -49 - wind, 37, -35, 45);
-  ctx.bezierCurveTo(-22, 39, -16, 23, -9, 3);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(31, -8);
-  ctx.bezierCurveTo(56 + wind, 9, 49 + wind, 37, 35, 45);
-  ctx.bezierCurveTo(22, 39, 16, 23, 9, 3);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  drawStar(-39 - wind * 0.35, 27, 8, "#fffdf2");
-  drawStar(39 + wind * 0.35, 27, 8, "#fffdf2");
-  ctx.restore();
-}
-
-function drawCatTail(x, y, stride, jumpPose) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(-0.45 + stride * 0.09 - jumpPose * 0.12);
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 6;
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.ellipse(0, 0, 12, 30, -0.08, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  drawFurTufts(-6, -21, 0.6);
-  ctx.restore();
-}
-
-function drawCatLeg(x, y, stride, jumpPose) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(stride * 0.16 - jumpPose * 0.18);
-  ctx.fillStyle = "#fffefe";
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 5;
-  ctx.beginPath();
-  ctx.ellipse(0, 10 - Math.abs(stride) * 2, 12, 23, 0.02, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(-8, 30);
-  ctx.quadraticCurveTo(-3, 34, 2, 30);
-  ctx.moveTo(2, 31);
-  ctx.quadraticCurveTo(7, 34, 11, 29);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawCatBody(x, y, stride, jumpPose) {
-  ctx.save();
-  ctx.translate(x, y + Math.max(0, jumpPose) * 2);
-  ctx.fillStyle = "#fffefe";
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 6;
-  ctx.beginPath();
-  ctx.ellipse(0, 19, 39, 47, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  drawFurTufts(-31, -7, 0.8);
-  drawFurTufts(31, -7, 0.8);
-  drawBellyFluff(0, 36);
-  ctx.restore();
-}
-
-function drawCatArm(x, y, side, stride, jumpPose) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(side * (0.25 + stride * 0.08) - jumpPose * side * 0.16);
-  ctx.fillStyle = "#fffefe";
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 5;
-  ctx.beginPath();
-  ctx.ellipse(0, 20, 10, 27, side * 0.05, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawCatHead(x, y, stride, jumpPose) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(stride * 0.02 - jumpPose * 0.04);
-  ctx.fillStyle = "#fffefe";
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 6;
-
-  drawCatEar(-29, -18, -0.22);
-  drawCatEar(29, -18, 0.22);
-
-  ctx.beginPath();
-  ctx.ellipse(0, 8, 43, 34, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  drawFurTufts(-34, 6, 0.75);
-  drawFurTufts(34, 6, 0.75);
-  drawForeheadFur(-4, -25);
-
-  ctx.fillStyle = "#ffb5bd";
-  ctx.globalAlpha = 0.68;
-  ctx.beginPath();
-  ctx.ellipse(-24, 19, 7, 4, -0.12, 0, Math.PI * 2);
-  ctx.ellipse(24, 19, 7, 4, 0.12, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-
-  ctx.fillStyle = ink;
-  ctx.beginPath();
-  ctx.ellipse(-15, 7, 4.5, 6, -0.18, 0, Math.PI * 2);
-  ctx.ellipse(15, 7, 4.5, 6, 0.18, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(-22, 0);
-  ctx.lineTo(-13, -3);
-  ctx.moveTo(22, 0);
-  ctx.lineTo(13, -3);
-  ctx.stroke();
-
-  ctx.fillStyle = "#ff9aa9";
-  ctx.beginPath();
-  ctx.ellipse(0, 16, 5, 3.8, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(0, 19);
-  ctx.quadraticCurveTo(-6, 26, -13, 20);
-  ctx.moveTo(0, 19);
-  ctx.quadraticCurveTo(6, 26, 13, 20);
-  ctx.stroke();
-
-  ctx.strokeStyle = "#2aa997";
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.arc(0, -11, 9, 0.25, Math.PI * 2.1);
-  ctx.arc(0, -11, 4, 0.15, Math.PI * 1.8, true);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawCatEar(x, y, rot) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(rot);
-  ctx.fillStyle = "#fffefe";
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 6;
-  ctx.beginPath();
-  ctx.moveTo(-15, 16);
-  ctx.lineTo(-4, -17);
-  ctx.quadraticCurveTo(8, -24, 16, 14);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = "#ffd3d9";
-  ctx.beginPath();
-  ctx.moveTo(-6, 8);
-  ctx.lineTo(-2, -8);
-  ctx.quadraticCurveTo(5, -10, 8, 8);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-function drawScarf(x, y, stride, jumpPose) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 5;
-  ctx.fillStyle = "#9de0d6";
-
-  ctx.beginPath();
-  ctx.ellipse(0, 0, 27, 10, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.ellipse(-13, 10, 15, 9, -0.46 + stride * 0.04, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.ellipse(13, 10, 15, 9, 0.46 + jumpPose * 0.05, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = "#7acfc3";
-  ctx.beginPath();
-  ctx.arc(0, 5, 7, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawForeheadFur(x, y) {
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 5;
-  ctx.beginPath();
-  ctx.moveTo(x - 14, y + 8);
-  ctx.quadraticCurveTo(x - 7, y - 2, x, y + 7);
-  ctx.quadraticCurveTo(x + 7, y - 5, x + 14, y + 6);
-  ctx.stroke();
-}
-
-function drawFurTufts(x, y, s) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(s, s);
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 5;
-  ctx.beginPath();
-  ctx.moveTo(-7, -2);
-  ctx.quadraticCurveTo(0, 5, 7, -2);
-  ctx.moveTo(-5, 8);
-  ctx.quadraticCurveTo(1, 14, 8, 8);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawBellyFluff(x, y) {
-  ctx.strokeStyle = "#d8ccc6";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(x - 10, y, 8, 0.15, Math.PI - 0.15);
-  ctx.arc(x + 7, y + 2, 8, 0.15, Math.PI - 0.15);
-  ctx.stroke();
 }
 
 function drawStar(x, y, r, color) {
@@ -871,4 +652,5 @@ window.addEventListener("resize", () => {
 
 resizeCanvas();
 resetGame();
+Promise.all(assetPromises).then(markAssetsReady).catch(markAssetsFailed);
 requestAnimationFrame(loop);

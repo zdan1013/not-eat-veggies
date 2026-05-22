@@ -109,6 +109,13 @@ canvas {
   box-shadow: 0 2px 0 #2e211d;
 }
 
+#start:disabled {
+  cursor: wait;
+  opacity: 0.76;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 7px 0 #2e211d;
+}
+
 .start-cloud {
   position: absolute;
   width: 170px;
