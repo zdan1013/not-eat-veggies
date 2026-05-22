@@ -17,6 +17,8 @@ const playerSpriteHeight = 225;
 const playerGroundOffset = 116;
 const playerMouthOffset = { x: 110, y: 9 };
 const itemMouthHeight = playerGroundOffset - playerMouthOffset.y;
+const maxEnergy = 100;
+const foodEnergy = 5;
 const assetStatus = {
   total: 0,
   loaded: 0,
@@ -102,11 +104,11 @@ function resetGame({ playing = false } = {}) {
     t: 0,
     speed: 165,
     distance: 0,
-    score: 0,
+    energy: 0,
     hearts: 5,
-    mood: 0,
     started: playing,
     over: false,
+    won: false,
     rider: {
       x: 275,
       y: playing ? launchY() : terrain(275) - playerGroundOffset,
@@ -220,7 +222,6 @@ function update(dt) {
 
   game.distance += game.speed * moveDt;
   game.speed = Math.min(245, game.speed + moveDt * 2.4);
-  game.mood = Math.max(0, game.mood - dt * 0.18);
 
   const rider = game.rider;
   const worldX = game.distance + rider.x;
@@ -261,14 +262,16 @@ function update(dt) {
       item.hit = true;
       if (item.bad) {
         game.hearts -= 1;
-        game.mood = 1;
         triggerEatFrame();
         triggerBadFoodEffect();
         if (game.hearts <= 0) game.over = true;
       } else {
-        game.score += 10;
-        game.mood = 0.55;
+        game.energy = Math.min(maxEnergy, game.energy + foodEnergy);
         triggerEatFrame();
+        if (game.energy >= maxEnergy) {
+          game.over = true;
+          game.won = true;
+        }
       }
     }
   }
@@ -506,29 +509,9 @@ function drawStar(x, y, r, color) {
 }
 
 function drawHud() {
-  drawSmile(43, 42);
-  drawEnergy(82, 27, 178, 31);
+  drawEnergy(34, 27, 250, 31);
   drawHeart(617, 42, 17, "#ffc6d1");
   outlinedText("x" + game.hearts, 653, 52, 28);
-  outlinedText(String(game.score), 35, 92, 25);
-}
-
-function drawSmile(x, y) {
-  ctx.fillStyle = "#fff179";
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 6;
-  ctx.beginPath();
-  ctx.arc(x, y, 23, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = ink;
-  ctx.beginPath();
-  ctx.arc(x - 8, y - 5, 3.5, 0, Math.PI * 2);
-  ctx.arc(x + 8, y - 5, 3.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(x, y + 1, 10, 0.25, Math.PI - 0.25);
-  ctx.stroke();
 }
 
 function drawEnergy(x, y, w, h) {
@@ -537,9 +520,9 @@ function drawEnergy(x, y, w, h) {
   roundRect(x, y, w, h, 14, false, true);
   ctx.save();
   ctx.clip();
-  const fillW = Math.max(22, w * (0.42 + game.hearts * 0.105));
-  ctx.fillStyle = game.mood > 0.8 ? "#f55344" : "#f38a37";
-  roundRect(x + 3, y + 3, fillW - 6, h - 6, 10, true, false);
+  const fillW = Math.max(0, (w - 6) * (game.energy / maxEnergy));
+  ctx.fillStyle = "#f38a37";
+  if (fillW > 0) roundRect(x + 3, y + 3, fillW, h - 6, 10, true, false);
   ctx.restore();
 }
 
@@ -563,9 +546,8 @@ function drawGameOver() {
   ctx.fillStyle = "rgba(255, 241, 206, 0.78)";
   ctx.fillRect(0, 0, W, H);
   const y = Math.round(H * 0.36);
-  outlinedText("不吃蔬菜", 154, y, 64);
-  outlinedText("得分 " + game.score, 244, y + 74, 36);
-  outlinedText("点 ↻ 再玩", 226, y + 134, 34);
+  outlinedText(game.won ? "通关!" : "不吃蔬菜", game.won ? 242 : 154, y, 64);
+  outlinedText("点 ↻ 再玩", 226, y + 92, 34);
 }
 
 function outlinedText(text, x, y, size) {
