@@ -17,7 +17,6 @@ const playerSpriteHeight = 225;
 const playerGroundOffset = 116;
 const playerMouthOffset = { x: 110, y: 9 };
 const itemMouthHeight = playerGroundOffset - playerMouthOffset.y;
-const playerOpenFrameYOffset = [19, 46, 19, 31];
 const maxEnergy = 100;
 const foodEnergy = 5;
 const assetStatus = {
@@ -474,11 +473,10 @@ function drawKittenSprite(jumpPose) {
   const scale = playerSpriteHeight / image.naturalHeight;
   const feetX = 56;
   const feetY = 123;
-  const yOffset = openFrame ? playerOpenFrameYOffset[game.eating.frameIndex] * scale : 0;
   const drawW = image.naturalWidth * scale;
   const drawH = image.naturalHeight * scale;
 
-  ctx.drawImage(image, feetX - drawW * 0.5, feetY - drawH + yOffset, drawW, drawH);
+  ctx.drawImage(image, feetX - drawW * 0.5, feetY - drawH, drawW, drawH);
 }
 
 function jumpFrameIndex(airTime, jumpPose) {
