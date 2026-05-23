@@ -509,9 +509,28 @@ function drawStar(x, y, r, color) {
 }
 
 function drawHud() {
-  drawEnergy(34, 27, 250, 31);
+  drawSmile(43, 42);
+  drawEnergy(82, 27, 202, 31);
   drawHeart(617, 42, 17, "#ffc6d1");
   outlinedText("x" + game.hearts, 653, 52, 28);
+}
+
+function drawSmile(x, y) {
+  ctx.fillStyle = "#fff179";
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.arc(x, y, 23, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = ink;
+  ctx.beginPath();
+  ctx.arc(x - 8, y - 5, 3.5, 0, Math.PI * 2);
+  ctx.arc(x + 8, y - 5, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x, y + 1, 10, 0.25, Math.PI - 0.25);
+  ctx.stroke();
 }
 
 function drawEnergy(x, y, w, h) {
